@@ -39,6 +39,18 @@
 #include <unordered_set>
 #include <algorithm>
 
+ros::Time compute_timestamp(const struct timeval& t_msg)
+{
+  // Record the ROS and message times the first time this function is called.
+  static const ros::Time t_ros_init = ros::Time::now();
+  static const ros::Time t_init(t_msg.tv_sec, 1000 * t_msg.tv_usec);
+  const ros::Time t(t_msg.tv_sec, 1000 * t_msg.tv_usec);
+  // Make the message timestamp relative to the first message and add it to the
+  // ROS time at the time the first message was received. This doesn't take
+  // network and processing delays into account.
+  return t_ros_init + (t - t_init);
+}
+
 namespace
 {
   std::unordered_set<std::string> name_blacklist_({"VRPN Control"});
@@ -111,7 +123,6 @@ namespace vrpn_client_ros
 
     std::string frame_id;
     nh.param<std::string>("frame_id", frame_id, "world");
-    nh.param<bool>("use_server_time", use_server_time_, false);
     nh.param<bool>("broadcast_tf", broadcast_tf_, false);
     nh.param<bool>("process_sensor_id", process_sensor_id_, false);
 
@@ -166,15 +177,7 @@ namespace vrpn_client_ros
 
     if (pose_pub->getNumSubscribers() > 0)
     {
-      if (tracker->use_server_time_)
-      {
-        tracker->pose_msg_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
-        tracker->pose_msg_.header.stamp.nsec = tracker_pose.msg_time.tv_usec * 1000;
-      }
-      else
-      {
-        tracker->pose_msg_.header.stamp = ros::Time::now();
-      }
+      tracker->pose_msg_.header.stamp = compute_timestamp(tracker_pose.msg_time);
 
       tracker->pose_msg_.pose.position.x = tracker_pose.pos[0];
       tracker->pose_msg_.pose.position.y = tracker_pose.pos[1];
@@ -192,15 +195,7 @@ namespace vrpn_client_ros
     {
       static tf2_ros::TransformBroadcaster tf_broadcaster;
 
-      if (tracker->use_server_time_)
-      {
-        tracker->transform_stamped_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
-        tracker->transform_stamped_.header.stamp.nsec = tracker_pose.msg_time.tv_usec * 1000;
-      }
-      else
-      {
-        tracker->transform_stamped_.header.stamp = ros::Time::now();
-      }
+      tracker->transform_stamped_.header.stamp = compute_timestamp(tracker_pose.msg_time);
 
       if (tracker->process_sensor_id_)
       {
@@ -251,15 +246,7 @@ namespace vrpn_client_ros
 
     if (twist_pub->getNumSubscribers() > 0)
     {
-      if (tracker->use_server_time_)
-      {
-        tracker->twist_msg_.header.stamp.sec = tracker_twist.msg_time.tv_sec;
-        tracker->twist_msg_.header.stamp.nsec = tracker_twist.msg_time.tv_usec * 1000;
-      }
-      else
-      {
-        tracker->twist_msg_.header.stamp = ros::Time::now();
-      }
+      tracker->twist_msg_.header.stamp = compute_timestamp(tracker_twist.msg_time);
 
       tracker->twist_msg_.twist.linear.x = tracker_twist.vel[0];
       tracker->twist_msg_.twist.linear.y = tracker_twist.vel[1];
@@ -306,15 +293,7 @@ namespace vrpn_client_ros
 
     if (accel_pub->getNumSubscribers() > 0)
     {
-      if (tracker->use_server_time_)
-      {
-        tracker->accel_msg_.header.stamp.sec = tracker_accel.msg_time.tv_sec;
-        tracker->accel_msg_.header.stamp.nsec = tracker_accel.msg_time.tv_usec * 1000;
-      }
-      else
-      {
-        tracker->accel_msg_.header.stamp = ros::Time::now();
-      }
+      tracker->accel_msg_.header.stamp = compute_timestamp(tracker_accel.msg_time);
 
       tracker->accel_msg_.accel.linear.x = tracker_accel.acc[0];
       tracker->accel_msg_.accel.linear.y = tracker_accel.acc[1];
